@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSM Location Logger</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #fff, #f0f8ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .map-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+        }
+        
+        .controls {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            margin-bottom: 20px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        button:hover::before {
+            left: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .status.success {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            color: white;
+        }
+        
+        .status.error {
+            background: linear-gradient(135deg, #f87171, #ef4444);
+            color: white;
+        }
+        
+        .status.info {
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            color: white;
+        }
+        
+        .location-info {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .location-info h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.2rem;
+        }
+        
+        .coords {
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            color: #555;
+            word-break: break-all;
+        }
+        
+        .logs {
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .logs h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.3rem;
+        }
+        
+        .logs::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .logs::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+        
+        .logs::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 4px;
+        }
+        
+        .log-entry {
+            background: rgba(102, 126, 234, 0.1);
+            border-left: 4px solid #667eea;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .log-time {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .log-coords {
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            #map {
+                height: 300px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📍 OSM Location Logger</h1>
+            <p>ติดตามและบันทึกตำแหน่งของคุณด้วย OpenStreetMap</p>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="controls">
+            <div id="status"></div>
+            
+            <div style="background: rgba(255,215,0,0.1); border: 1px solid #ffd700; border-radius: 10px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="color: #ff8c00; margin: 0 0 10px 0;">📱 วิธีแก้ปัญหา:</h4>
+                <ul style="margin: 0; padding-left: 20px; color: #333; font-size: 14px;">
+                    <li>📍 <strong>GPS ไม่ทำงาน:</strong> เปิดในแท็บใหม่ (กดไอคอน ↗️ มุมบนขวา)</li>
+                    <li>🗺️ <strong>แผนที่ไม่ขึ้น:</strong> รีเฟรชหน้าเว็บ หรือลองเบราว์เซอร์อื่น</li>
+                    <li>🔒 <strong>ไม่อนุญาต:</strong> ไปที่ Settings > Site permissions > Location</li>
+                </ul>
+            </div>
+            
+            <div class="button-group">
+                <button id="getLocation">🎯 รับตำแหน่งปัจจุบัน</button>
+                <button id="logLocation" disabled>📝 บันทึกตำแหน่ง</button>
+                <button id="testLocation">🧪 ทดสอบด้วยตำแหน่งจำลอง</button>
+                <button id="clearLogs">🗑️ ล้างประวัติ</button>
+            </div>
+            
+            <div id="locationInfo" class="location-info" style="display: none;">
+                <h3>ตำแหน่งปัจจุบัน</h3>
+                <div class="coords" id="currentCoords"></div>
+            </div>
+        </div>
+        
+        <div class="logs">
+            <h3>📋 ประวัติการบันทึกตำแหน่ง (<span id="logCount">0</span>)</h3>
+            <div id="logEntries"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+    <script>
+        let map;
+        let currentLocationMarker;
+        let currentPosition = null;
+        let locationLogs = [];
+        
+        // Initialize map
+        function initMap() {
+            try {
+                map = L.map('map').setView([13.7563, 100.5018], 10); // Default to Bangkok
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors',
+                    maxZoom: 19,
+                    crossOrigin: true
+                }).addTo(map);
+                
+                showStatus('แผนที่พร้อมใช้งาน กดปุ่มเพื่อรับตำแหน่งปัจจุบัน', 'info');
+                
+                // Force map to resize after a short delay
+                setTimeout(() => {
+                    map.invalidateSize();
+                }, 100);
+                
+            } catch (error) {
+                console.error('Map initialization error:', error);
+                showStatus('ไม่สามารถโหลดแผนที่ได้ - ลองรีเฟรชหน้าเว็บ', 'error');
+            }
+        }
+        
+        // Show status message
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+        
+        // Check geolocation support and permissions
+        function checkGeolocationSupport() {
+            if (!navigator.geolocation) {
+                showStatus('❌ เบราว์เซอร์ไม่รองรับ Geolocation', 'error');
+                return false;
+            }
+            
+            // Check if running in iframe (Claude environment)
+            if (window.self !== window.top) {
+                showStatus('⚠️ กำลังทำงานใน iframe - อาจต้องเปิดในแท็บใหม่เพื่อใช้ GPS', 'info');
+            }
+            
+            return true;
+        }
+        
+        // Get user location
+        function getCurrentLocation() {
+            if (!checkGeolocationSupport()) {
+                return;
+            }
+            
+            showStatus('🔍 กำลังค้นหาตำแหน่งของคุณ... (กรุณาอนุญาตการเข้าถึงตำแหน่ง)', 'info');
+            
+            // Try to get permission first
+            if (navigator.permissions) {
+                navigator.permissions.query({name: 'geolocation'}).then(function(result) {
+                    console.log('Geolocation permission:', result.state);
+                    if (result.state === 'denied') {
+                        showStatus('❌ การเข้าถึงตำแหน่งถูกปฏิเสธ - กรุณาเปิดในการตั้งค่าเบราว์เซอร์', 'error');
+                        return;
+                    }
+                });
+            }
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    currentPosition = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        timestamp: new Date()
+                    };
+                    
+                    updateMap();
+                    updateLocationInfo();
+                    document.getElementById('logLocation').disabled = false;
+                    showStatus('✅ พบตำแหน่งเรียบร้อย!', 'success');
+                },
+                (error) => {
+                    let errorMsg = 'ไม่สามารถรับตำแหน่งได้';
+                    let suggestions = '';
+                    
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = '❌ ผู้ใช้ปฏิเสธการขอเข้าถึงตำแหน่ง';
+                            suggestions = '<br>💡 ลองเปิดในแท็บใหม่หรือเปิดการอนุญาตใน browser settings';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = '📍 ข้อมูลตำแหน่งไม่พร้อมใช้งาน';
+                            suggestions = '<br>💡 ตรวจสอบว่าเปิด GPS และมีสัญญาณอินเทอร์เน็ต';
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = '⏰ หมดเวลาในการค้นหาตำแหน่ง';
+                            suggestions = '<br>💡 ลองใหม่อีกครั้ง';
+                            break;
+                    }
+                    
+                    document.getElementById('status').innerHTML = errorMsg + suggestions;
+                    document.getElementById('status').className = 'status error';
+                    document.getElementById('status').style.display = 'block';
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 60000
+                }
+            );
+        }
+        
+        // Update map with current location
+        function updateMap() {
+            if (!currentPosition) return;
+            
+            // Remove existing marker
+            if (currentLocationMarker) {
+                map.removeLayer(currentLocationMarker);
+            }
+            
+            // Add new marker
+            currentLocationMarker = L.marker([currentPosition.lat, currentPosition.lng])
+                .addTo(map)
+                .bindPopup(`
+                    <div style="text-align: center;">
+                        <strong>📍 ตำแหน่งปัจจุบัน</strong><br>
+                        <small>Lat: ${currentPosition.lat.toFixed(6)}</small><br>
+                        <small>Lng: ${currentPosition.lng.toFixed(6)}</small><br>
+                        <small>ความแม่นยำ: ${Math.round(currentPosition.accuracy)}m</small>
+                    </div>
+                `)
+                .openPopup();
+            
+            // Center map on location
+            map.setView([currentPosition.lat, currentPosition.lng], 15);
+        }
+        
+        // Update location info display
+        function updateLocationInfo() {
+            if (!currentPosition) return;
+            
+            const infoDiv = document.getElementById('locationInfo');
+            const coordsDiv = document.getElementById('currentCoords');
+            
+            coordsDiv.innerHTML = `
+                <strong>Latitude:</strong> ${currentPosition.lat.toFixed(6)}<br>
+                <strong>Longitude:</strong> ${currentPosition.lng.toFixed(6)}<br>
+                <strong>ความแม่นยำ:</strong> ${Math.round(currentPosition.accuracy)} เมตร<br>
+                <strong>เวลา:</strong> ${currentPosition.timestamp.toLocaleString('th-TH')}
+            `;
+            
+            infoDiv.style.display = 'block';
+        }
+        
+        // Log current location
+        function logCurrentLocation() {
+            if (!currentPosition) {
+                showStatus('ไม่พบตำแหน่งปัจจุบัน กรุณารับตำแหน่งก่อน', 'error');
+                return;
+            }
+            
+            const logEntry = {
+                id: Date.now(),
+                lat: currentPosition.lat,
+                lng: currentPosition.lng,
+                accuracy: currentPosition.accuracy,
+                timestamp: new Date()
+            };
+            
+            locationLogs.unshift(logEntry);
+            updateLogDisplay();
+            showStatus('บันทึกตำแหน่งเรียบร้อย!', 'success');
+        }
+        
+        // Update log display
+        function updateLogDisplay() {
+            const logEntriesDiv = document.getElementById('logEntries');
+            const logCountSpan = document.getElementById('logCount');
+            
+            logCountSpan.textContent = locationLogs.length;
+            
+            if (locationLogs.length === 0) {
+                logEntriesDiv.innerHTML = '<p style="color: #666; text-align: center; font-style: italic;">ยังไม่มีการบันทึกตำแหน่ง</p>';
+                return;
+            }
+            
+            logEntriesDiv.innerHTML = locationLogs.map(log => `
+                <div class="log-entry">
+                    <div class="log-time">🕒 ${log.timestamp.toLocaleString('th-TH')}</div>
+                    <div class="log-coords">
+                        📍 Lat: ${log.lat.toFixed(6)}, Lng: ${log.lng.toFixed(6)}<br>
+                        🎯 ความแม่นยำ: ${Math.round(log.accuracy)} เมตร
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Clear all logs
+        function clearLogs() {
+            if (locationLogs.length === 0) {
+                showStatus('ไม่มีประวัติให้ลบ', 'info');
+                return;
+            }
+            
+            if (confirm('คุณต้องการลบประวัติการบันทึกทั้งหมดหรือไม่?')) {
+                locationLogs = [];
+                updateLogDisplay();
+                showStatus('ล้างประวัติการบันทึกเรียบร้อย', 'success');
+            }
+        }
+        
+        // Test with mock location (for testing when GPS doesn't work)
+        function testWithMockLocation() {
+            // Use Bangkok coordinates as test
+            currentPosition = {
+                lat: 13.7563 + (Math.random() - 0.5) * 0.01, // Add small random offset
+                lng: 100.5018 + (Math.random() - 0.5) * 0.01,
+                accuracy: 10,
+                timestamp: new Date()
+            };
+            
+            updateMap();
+            updateLocationInfo();
+            document.getElementById('logLocation').disabled = false;
+            showStatus('🧪 ใช้ตำแหน่งจำลอง (กรุงเทพฯ) เพื่อทดสอบ', 'success');
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            initMap();
+            updateLogDisplay();
+            
+            document.getElementById('getLocation').addEventListener('click', getCurrentLocation);
+            document.getElementById('logLocation').addEventListener('click', logCurrentLocation);
+            document.getElementById('testLocation').addEventListener('click', testWithMockLocation);
+            document.getElementById('clearLogs').addEventListener('click', clearLogs);
+        });
+        
+        // Auto-update location every 30 seconds (optional)
+        setInterval(() => {
+            if (currentPosition && navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        currentPosition = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude,
+                            accuracy: position.coords.accuracy,
+                            timestamp: new Date()
+                        };
+                        updateMap();
+                        updateLocationInfo();
+                    },
+                    () => {}, // Ignore errors on auto-update
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 30000
+                    }
+                );
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
